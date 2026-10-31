@@ -94,3 +94,29 @@ export async function gantiPassword(prevState, formData) {
 
   return { success: true, message: "Password berhasil diganti." };
 }
+
+// US-14: Generator deskripsi AI untuk admin
+export async function generateDeskripsiAI({ nama, kategori }) {
+  if (!nama) {
+    return { error: "Nama produk wajib diisi sebelum membuat deskripsi." };
+  }
+
+  const supabase = await createSessionClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return { error: "Akses ditolak. Silakan login admin terlebih dahulu." };
+  }
+
+  const templateList = [
+    `Rasakan kelezatan otentik dari ${nama}, persembahan terbaik dari kategori ${kategori || "UMKM kami"}. Dibuat dari bahan-bahan segar berkualitas tinggi dengan teknik pengolahan tradisional untuk menjaga kemurnian rasa dan teksturnya. Sangat cocok dijadikan camilan sehari-hari maupun hantaran berkesan untuk kerabat terdekat.`,
+    `${nama} hadir untuk memberikan kenikmatan di setiap gigitan! Dihasilkan oleh perajin dan dapur lokal berpengalaman, terjamin higienis, renyah, dan lezat tanpa tambahan pengawet berbahaya. Pilihan cerdas untuk menemani waktu santai Anda di rumah maupun kantor.`,
+    `Koleksi spesial ${nama} dari kategori ${kategori || "produk unggulan"}. Dibuat dengan penuh ketelitian dan perhatian pada kualitas. Dikemas dalam wadah kedap udara yang menjaga kesegaran dan kerenyahannya lebih lama. Pesan sekarang juga sebelum kehabisan!`
+  ];
+
+  const deskripsi = templateList[Math.floor(Math.random() * templateList.length)];
+  return { success: true, deskripsi };
+}

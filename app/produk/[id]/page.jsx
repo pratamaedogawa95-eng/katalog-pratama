@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { formatRupiah } from "@/lib/format";
 import { createServerClient } from "@/lib/supabase/server";
+import GaleriFotoProduk from "@/components/GaleriFotoProduk";
 import AksiDetailProduk from "@/components/AksiDetailProduk";
+import AsistenAIProduk from "@/components/AsistenAIProduk";
+import UlasanProduk from "@/components/UlasanProduk";
+import ProdukTerkait from "@/components/ProdukTerkait";
 import CatatDilihatKlien from "@/components/CatatDilihatKlien";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +14,7 @@ export default async function HalamanDetailProduk({ params }) {
   const { id } = await params;
   const supabase = createServerClient();
 
+  // Ambil detail produk
   const { data: produk, error } = await supabase
     .from("produk")
     .select("*")
@@ -21,16 +25,30 @@ export default async function HalamanDetailProduk({ params }) {
     notFound();
   }
 
+  // US-17: Ambil produk terkait dari kategori yang sama
+  const { data: produkTerkait } = await supabase
+    .from("produk")
+    .select("*")
+    .eq("kategori", produk.kategori)
+    .neq("id", id)
+    .limit(3);
+
+  // US-18: Galeri foto (foto utama + variasi sudut jika ada)
+  const galeriTambahan = produk.galeri || [];
+
   return (
-    <>
+    <div className="py-8 md:py-12">
       <CatatDilihatKlien produk={produk} />
 
-      <article className="grid gap-8 py-8 md:grid-cols-2 md:py-12">
-        <img
-          src={produk.foto_url}
+      {/* Bagian Atas: Galeri & Detail Info */}
+      <article className="grid gap-8 md:grid-cols-2">
+        {/* US-18: Galeri Foto Interaktif */}
+        <GaleriFotoProduk
+          fotoUtama={produk.foto_url}
           alt={produk.nama}
-          className="aspect-square w-full rounded-2xl border border-garis bg-permukaan object-cover"
+          galeriTambahan={galeriTambahan}
         />
+
         <div className="flex flex-col gap-4">
           <Link
             href="/"
@@ -51,18 +69,23 @@ export default async function HalamanDetailProduk({ params }) {
             {produk.nama}
           </h1>
 
-          <p className="self-start rounded-md bg-harga-latar px-3 py-1 text-xl font-bold text-harga">
-            {formatRupiah(produk.harga)}
-          </p>
-
           <p className="max-w-prose leading-relaxed text-teks-lembut">
-            {produk.deskripsi}
+            {produk.deskripsi || "Produk pilihan terbaik diproduksi dengan bahan baku bermutu tinggi."}
           </p>
 
-          {/* US-12 & US-21 & US-24 & US-37: Aksi Interaktif */}
+          {/* US-12 & 19 & 20 & 21 & 23 & 40 & 48: Interaksi Harga, Varian, Keranjang, Salin Link */}
           <AksiDetailProduk produk={produk} />
         </div>
       </article>
-    </>
+
+      {/* US-50: Asisten AI Tanya Jawab Produk */}
+      <AsistenAIProduk produk={produk} />
+
+      {/* US-38: Ulasan & Rating Bintang */}
+      <UlasanProduk produkId={produk.id} />
+
+      {/* US-17: Produk Terkait di Bawah */}
+      <ProdukTerkait produkTerkait={produkTerkait || []} />
+    </div>
   );
 }
