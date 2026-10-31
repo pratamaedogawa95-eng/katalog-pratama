@@ -1,24 +1,70 @@
-import KartuProduk from "@/components/KartuProduk";
 import { toko } from "@/lib/toko";
 import { createServerClient } from "@/lib/supabase/server";
+import KatalogProdukInteraktif from "@/components/KatalogProdukInteraktif";
 
 export const dynamic = "force-dynamic";
 
-export default async function HalamanKatalog() {
+export default async function HalamanKatalog({ searchParams }) {
+  const search = await searchParams;
+  const kategoriAktif = search?.kategori || "";
+  const pencarianAktif = search?.q || "";
+  const urutanAktif = search?.urut || "terbaru";
+  const currentLimit = Number(search?.limit) || 12;
+
   let daftarProduk = [];
+  let daftarKategori = [];
+  let totalCount = 0;
   let errorMessage = null;
 
   try {
     const supabase = createServerClient();
-    const { data, error } = await supabase
-      .from("produk")
-      .select("*")
-      .order("id", { ascending: true });
+
+    // Ambil daftar kategori unik untuk filter
+    const { data: katData } = await supabase.from("produk").select("kategori");
+    if (katData) {
+      daftarKategori = Array.from(
+        new Set(katData.map((k) => k.kategori).filter(Boolean))
+      );
+    }
+
+    // Bangun query produk di server (US-11, US-15, US-16)
+    let query = supabase.from("produk").select("*", { count: "exact" });
+
+    // Filter Kategori (US-11)
+    if (kategoriAktif && kategoriAktif !== "semua") {
+      query = query.eq("kategori", kategoriAktif);
+    }
+
+    // Pencarian nama produk (US-11)
+    if (pencarianAktif && pencarianAktif.trim() !== "") {
+      query = query.ilike("nama", `%${pencarianAktif.trim()}%`);
+    }
+
+    // Urutan produk (US-15 & 49)
+    if (urutanAktif === "termurah") {
+      query = query.order("harga", { ascending: true });
+    } else if (urutanAktif === "termahal") {
+      query = query.order("harga", { ascending: false });
+    } else if (urutanAktif === "abjad_asc") {
+      query = query.order("nama", { ascending: true });
+    } else if (urutanAktif === "abjad_desc") {
+      query = query.order("nama", { ascending: false });
+    } else if (urutanAktif === "terbaru") {
+      query = query.order("created_at", { ascending: false });
+    } else {
+      query = query.order("id", { ascending: true });
+    }
+
+    // Paginasi / pembatasan jumlah di database (US-16)
+    query = query.limit(currentLimit);
+
+    const { data, count, error } = await query;
 
     if (error) {
       errorMessage = `Gagal memuat produk: ${error.message}`;
     } else {
       daftarProduk = data || [];
+      totalCount = count || 0;
     }
   } catch (err) {
     errorMessage = `Gagal menghubungkan ke database: ${err.message}`;
@@ -26,34 +72,29 @@ export default async function HalamanKatalog() {
 
   return (
     <>
-      <section className="py-10 sm:py-14">
-        <h1 className="max-w-2xl text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl">
+      <section className="py-8 sm:py-12">
+        <h1 className="max-w-2xl text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl text-teks">
           {toko.nama}
         </h1>
         <p className="mt-3 max-w-xl text-lg text-teks-lembut">{toko.tagline}</p>
-        <p className="mt-4 text-sm text-teks-lembut">{toko.jamBuka}</p>
+        <p className="mt-3 text-sm text-teks-lembut">🕒 {toko.jamBuka}</p>
       </section>
 
-      <section aria-labelledby="judul-produk" className="flex flex-col gap-5">
-        <h2 id="judul-produk" className="text-xl font-bold">
+      <section aria-labelledby="judul-produk" className="flex flex-col gap-5 pb-12">
+        <h2 id="judul-produk" className="text-xl font-bold text-teks">
           Produk kami
         </h2>
 
-        {errorMessage ? (
-          <p className="rounded-lg border border-garis bg-permukaan p-4 text-sm text-bahaya">
-            {errorMessage}
-          </p>
-        ) : daftarProduk.length === 0 ? (
-          <p className="rounded-lg border border-garis bg-permukaan p-4 text-sm text-teks-lembut">
-            Belum ada produk
-          </p>
-        ) : (
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
-            {daftarProduk.map((produk) => (
-              <KartuProduk key={produk.id} produk={produk} />
-            ))}
-          </div>
-        )}
+        <KatalogProdukInteraktif
+          daftarProduk={daftarProduk}
+          daftarKategori={daftarKategori}
+          totalCount={totalCount}
+          currentLimit={currentLimit}
+          kategoriAktif={kategoriAktif}
+          pencarianAktif={pencarianAktif}
+          urutanAktif={urutanAktif}
+          errorMessage={errorMessage}
+        />
       </section>
     </>
   );
