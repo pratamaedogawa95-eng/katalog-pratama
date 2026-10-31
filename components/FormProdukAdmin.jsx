@@ -8,7 +8,11 @@ import { tambahProduk, ubahProduk, generateDeskripsiAI } from "@/app/admin/actio
 
 const initialState = {};
 
-export default function FormProdukAdmin({ mode = "tambah", produk = {} }) {
+export default function FormProdukAdmin({
+  mode = "tambah",
+  produk = {},
+  daftarKategori = [],
+}) {
   const action = mode === "ubah" ? ubahProduk : tambahProduk;
   const [state, formAction] = useFormState(action, initialState);
   const [preview, setPreview] = useState(null);
@@ -16,7 +20,22 @@ export default function FormProdukAdmin({ mode = "tambah", produk = {} }) {
   const [deskripsi, setDeskripsi] = useState(produk.deskripsi || "");
   const [nama, setNama] = useState(produk.nama || "");
   const [kategori, setKategori] = useState(produk.kategori || "");
+  const [modeKategoriBaru, setModeKategoriBaru] = useState(false);
   const fileRef = useRef(null);
+
+  // Kategori default jika belum ada dari database
+  const bawaanKategori = [
+    "Makanan",
+    "Minuman",
+    "Camilan",
+    "Bumbu",
+    "Kue kering",
+    "Kerajinan",
+    "Kain",
+  ];
+  const listKategori = Array.from(
+    new Set([...daftarKategori, ...bawaanKategori, ...(produk.kategori ? [produk.kategori] : [])])
+  ).filter(Boolean);
 
   function handleFileChange(e) {
     const file = e.target.files?.[0];
@@ -99,13 +118,53 @@ export default function FormProdukAdmin({ mode = "tambah", produk = {} }) {
         defaultValue={produk.stok ?? 10}
       />
 
-      {/* Kategori */}
-      <Input
-        label="Kategori"
-        name="kategori"
-        defaultValue={produk.kategori}
-        onChange={(e) => setKategori(e.target.value)}
-      />
+      {/* Kategori (Dropdown pilihan dengan opsi ketik baru) */}
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-semibold text-teks">Kategori</label>
+          <button
+            type="button"
+            onClick={() => setModeKategoriBaru(!modeKategoriBaru)}
+            className="text-xs font-semibold text-utama hover:underline"
+          >
+            {modeKategoriBaru ? "← Pilih dari daftar" : "+ Ketik kategori baru"}
+          </button>
+        </div>
+
+        {modeKategoriBaru ? (
+          <input
+            type="text"
+            name="kategori"
+            value={kategori}
+            onChange={(e) => setKategori(e.target.value)}
+            placeholder="Ketik nama kategori baru..."
+            className="w-full rounded-lg border border-garis bg-latar px-3 py-2.5 text-base text-teks placeholder:text-teks-lembut focus:border-utama focus:outline-none"
+            autoFocus
+          />
+        ) : (
+          <select
+            name="kategori"
+            value={kategori}
+            onChange={(e) => {
+              if (e.target.value === "__tambah_baru__") {
+                setModeKategoriBaru(true);
+                setKategori("");
+              } else {
+                setKategori(e.target.value);
+              }
+            }}
+            className="w-full rounded-lg border border-garis bg-latar px-3 py-2.5 text-base text-teks focus:border-utama focus:outline-none"
+          >
+            <option value="">-- Pilih Kategori --</option>
+            {listKategori.map((k) => (
+              <option key={k} value={k}>
+                {k}
+              </option>
+            ))}
+            <option value="__tambah_baru__">+ Tambah kategori baru...</option>
+          </select>
+        )}
+      </div>
 
       {/* Foto upload */}
       <div className="flex flex-col gap-2">

@@ -65,13 +65,24 @@ export default function KartuProduk({ produk }) {
         <Link
           href={`/produk/${produk.id}`}
           onClick={() => catatTerakhirDilihat(produk)}
-          className="block h-full w-full"
+          className="flex h-full w-full items-center justify-center"
         >
-          <img
-            src={produk.foto_url}
-            alt={produk.nama}
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-          />
+          {produk.foto_url ? (
+            <img
+              src={produk.foto_url}
+              alt={produk.nama}
+              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = "/produk/kopi.svg";
+              }}
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center gap-1.5 p-4 text-center text-teks-lembut">
+              <span className="text-4xl">🍲</span>
+              <span className="text-xs font-semibold">Foto belum ada</span>
+            </div>
+          )}
         </Link>
 
         {/* Tombol Favorit (US-24) */}

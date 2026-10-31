@@ -23,20 +23,56 @@ export default function TabelProdukAdmin({ daftarProduk }) {
     setLoading(`toggle-${id}`);
     const hasil = await toggleAktifProduk(id, aktif);
     if (hasil?.error) {
-      setPesan(`Gagal: ${hasil.error}`);
+      if (
+        hasil.error.includes("aktif") ||
+        hasil.error.includes("schema cache") ||
+        hasil.error.includes("does not exist")
+      ) {
+        setPesan(
+          "Fitur status Aktif/Nonaktif memerlukan kolom 'aktif' di tabel Supabase. Jalankan script 'docs/schema-bonus.sql' di Supabase SQL Editor untuk mengaktifkannya."
+        );
+      } else {
+        setPesan(`Gagal: ${hasil.error}`);
+      }
     }
     setLoading(null);
   }
 
   async function handleNaik(id, urutan) {
     setLoading(`naik-${id}`);
-    await naikUrutanProduk(id, urutan);
+    const hasil = await naikUrutanProduk(id, urutan);
+    if (hasil?.error) {
+      if (
+        hasil.error.includes("urutan") ||
+        hasil.error.includes("schema cache") ||
+        hasil.error.includes("does not exist")
+      ) {
+        setPesan(
+          "Fitur atur urutan memerlukan kolom 'urutan' di tabel Supabase. Jalankan script 'docs/schema-bonus.sql' di Supabase SQL Editor untuk mengaktifkannya."
+        );
+      } else {
+        setPesan(`Gagal: ${hasil.error}`);
+      }
+    }
     setLoading(null);
   }
 
   async function handleTurun(id, urutan) {
     setLoading(`turun-${id}`);
-    await turunUrutanProduk(id, urutan);
+    const hasil = await turunUrutanProduk(id, urutan);
+    if (hasil?.error) {
+      if (
+        hasil.error.includes("urutan") ||
+        hasil.error.includes("schema cache") ||
+        hasil.error.includes("does not exist")
+      ) {
+        setPesan(
+          "Fitur atur urutan memerlukan kolom 'urutan' di tabel Supabase. Jalankan script 'docs/schema-bonus.sql' di Supabase SQL Editor untuk mengaktifkannya."
+        );
+      } else {
+        setPesan(`Gagal: ${hasil.error}`);
+      }
+    }
     setLoading(null);
   }
 
@@ -87,12 +123,23 @@ export default function TabelProdukAdmin({ daftarProduk }) {
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
-                    {produk.foto_url && (
+                    {produk.foto_url ? (
                       <img
                         src={produk.foto_url}
-                        alt=""
-                        className="h-10 w-10 rounded-md object-cover flex-shrink-0"
+                        alt={produk.nama}
+                        className="h-10 w-10 shrink-0 rounded-md object-cover border border-garis bg-permukaan"
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = "/produk/kopi.svg";
+                        }}
                       />
+                    ) : (
+                      <div
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-garis bg-permukaan text-base"
+                        title="Belum ada foto"
+                      >
+                        🍲
+                      </div>
                     )}
                     <span className="font-semibold">{produk.nama}</span>
                   </div>

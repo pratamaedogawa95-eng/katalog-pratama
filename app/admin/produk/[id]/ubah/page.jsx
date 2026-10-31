@@ -18,11 +18,23 @@ export default async function HalamanUbahProduk({ params }) {
     notFound();
   }
 
+  let daftarKategori = [];
+  try {
+    const { data } = await supabase.from("produk").select("kategori");
+    daftarKategori = Array.from(
+      new Set((data || []).map((p) => p.kategori).filter(Boolean))
+    );
+  } catch {}
+
   return (
     <div className="flex flex-col gap-6 py-8">
       <NavAdmin />
       <h1 className="text-2xl font-extrabold">Ubah produk</h1>
-      <FormProdukAdmin mode="ubah" produk={produk} />
+      <FormProdukAdmin
+        mode="ubah"
+        produk={produk}
+        daftarKategori={daftarKategori}
+      />
     </div>
   );
 }

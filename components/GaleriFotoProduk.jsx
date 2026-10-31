@@ -13,12 +13,23 @@ export default function GaleriFotoProduk({ fotoUtama, alt, galeriTambahan = [] }
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="overflow-hidden rounded-2xl border border-garis bg-permukaan">
-        <img
-          src={fotoAktif}
-          alt={alt}
-          className="aspect-square w-full object-cover transition duration-300"
-        />
+      <div className="overflow-hidden rounded-2xl border border-garis bg-permukaan aspect-square flex items-center justify-center">
+        {fotoAktif ? (
+          <img
+            src={fotoAktif}
+            alt={alt}
+            className="aspect-square w-full object-cover transition duration-300"
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = "/produk/kopi.svg";
+            }}
+          />
+        ) : (
+          <div className="flex flex-col items-center justify-center gap-2 text-teks-lembut">
+            <span className="text-6xl">🍲</span>
+            <span className="text-sm font-semibold">Foto belum tersedia</span>
+          </div>
+        )}
       </div>
 
       {/* US-18: Thumbnail galeri jika foto lebih dari satu */}
