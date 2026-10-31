@@ -41,11 +41,18 @@ export async function proxy(request) {
 
   const { pathname } = request.nextUrl;
 
+  // K-8: Cegah pengindeksan rute admin via HTTP Header
+  if (pathname.startsWith("/admin")) {
+    response.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+  }
+
   // Semua rute /admin kecuali /admin/login wajib login dengan Supabase Auth
   if (pathname.startsWith("/admin") && pathname !== "/admin/login") {
     if (!user) {
       const loginUrl = new URL("/admin/login", request.url);
-      return NextResponse.redirect(loginUrl);
+      const redirectResponse = NextResponse.redirect(loginUrl);
+      redirectResponse.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+      return redirectResponse;
     }
   }
 

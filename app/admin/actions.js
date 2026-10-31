@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { createSessionClient } from "@/lib/supabase/session";
 import { createServerClient } from "@/lib/supabase/server";
 
@@ -55,7 +56,7 @@ async function uploadFoto(file, bucket = "produk-foto") {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// US-04: Login admin
+// US-04 & K-12: Login admin dengan pembatasan percobaan gagal
 // ═══════════════════════════════════════════════════════════════════
 export async function loginAdmin(prevState, formData) {
   const data =
@@ -72,14 +73,54 @@ export async function loginAdmin(prevState, formData) {
 
   if (!email || !password) return { error: "Email dan password wajib diisi." };
 
+  // K-12: Rate limiting via cookie
+  const cookieStore = await cookies();
+  const attemptsCookie = cookieStore.get("login_percobaan")?.value;
+  let attempts = { count: 0, resetAt: 0 };
+  if (attemptsCookie) {
+    try {
+      attempts = JSON.parse(attemptsCookie);
+    } catch {}
+  }
+
+  // Jika sudah melebihi 5x dan waktu reset belum tiba
+  if (attempts.count >= 5 && Date.now() < attempts.resetAt) {
+    const sisaMenit = Math.max(1, Math.ceil((attempts.resetAt - Date.now()) / 60000));
+    return {
+      error: `Terlalu banyak percobaan masuk yang gagal. Silakan coba lagi dalam ${sisaMenit} menit demi keamanan.`,
+    };
+  }
+
   const supabase = await createSessionClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
-    if (error.message.includes("Invalid login credentials"))
-      return { error: "Email atau password salah." };
-    return { error: error.message || "Gagal masuk. Silakan coba lagi." };
+    // Tambah counter kegagalan
+    const now = Date.now();
+    const newCount = (attempts.resetAt && now < attempts.resetAt) ? attempts.count + 1 : 1;
+    const newResetAt = (attempts.resetAt && now < attempts.resetAt) ? attempts.resetAt : now + 15 * 60 * 1000;
+
+    cookieStore.set("login_percobaan", JSON.stringify({ count: newCount, resetAt: newResetAt }), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 15 * 60,
+      path: "/",
+    });
+
+    if (error.message.includes("Invalid login credentials")) {
+      const sisa = Math.max(0, 5 - newCount);
+      return {
+        error: sisa > 0
+          ? `Email atau password salah. (Sisa ${sisa} percobaan)`
+          : "Akun terkunci sementara karena terlalu banyak percobaan gagal. Silakan tunggu 15 menit.",
+      };
+    }
+    return { error: "Gagal masuk. Silakan periksa kredensial Anda." };
   }
+
+  // Berhasil login: hapus counter rate limit
+  cookieStore.delete("login_percobaan");
 
   revalidatePath("/", "layout");
   redirect("/admin");
@@ -617,4 +658,163 @@ export async function toggleAktifBanner(id, aktifSekarang) {
   revalidatePath("/");
   revalidatePath("/admin/banner");
   return { success: true };
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// US-35 & US-46: Ekspor dan Impor Produk CSV
+// ═══════════════════════════════════════════════════════════════════
+
+// Helper internal: Parser CSV yang aman dari karakter koma, kutip, & baris baru
+function parseCSV(text) {
+  const rows = [];
+  let currentRow = [];
+  let currentVal = "";
+  let insideQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const nextChar = text[i + 1];
+
+    if (char === '"') {
+      if (insideQuotes && nextChar === '"') {
+        currentVal += '"';
+        i++;
+      } else {
+        insideQuotes = !insideQuotes;
+      }
+    } else if (char === "," && !insideQuotes) {
+      currentRow.push(currentVal.trim());
+      currentVal = "";
+    } else if ((char === "\r" || char === "\n") && !insideQuotes) {
+      if (char === "\r" && nextChar === "\n") i++;
+      currentRow.push(currentVal.trim());
+      if (currentRow.some((c) => c.length > 0)) {
+        rows.push(currentRow);
+      }
+      currentRow = [];
+      currentVal = "";
+    } else {
+      currentVal += char;
+    }
+  }
+
+  if (currentVal.length > 0 || currentRow.length > 0) {
+    currentRow.push(currentVal.trim());
+    if (currentRow.some((c) => c.length > 0)) {
+      rows.push(currentRow);
+    }
+  }
+
+  return rows;
+}
+
+export async function imporProdukCSV(prevState, formData) {
+  const fd =
+    formData instanceof FormData
+      ? formData
+      : prevState instanceof FormData
+      ? prevState
+      : null;
+  if (!fd) return { error: "Data formulir tidak valid." };
+
+  const { supabase, user } = await cekLogin();
+  if (!user) return { error: "Akses ditolak. Silakan login terlebih dahulu." };
+
+  const file = fd.get("file_csv");
+  if (!file || file.size === 0) {
+    return { error: "Pilih file CSV terlebih dahulu." };
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    return { error: "Ukuran file CSV maksimal 5 MB." };
+  }
+
+  let text;
+  try {
+    text = await file.text();
+  } catch {
+    return { error: "Gagal membaca isi file CSV." };
+  }
+
+  const rows = parseCSV(text);
+  if (rows.length < 2) {
+    return { error: "File CSV kosong atau tidak memiliki baris data." };
+  }
+
+  const header = rows[0].map((h) => h.toLowerCase().trim());
+  const idxNama = header.indexOf("nama");
+  const idxHarga = header.indexOf("harga");
+  const idxKategori = header.indexOf("kategori");
+  const idxDeskripsi = header.indexOf("deskripsi");
+  const idxFoto = header.indexOf("foto_url");
+  const idxStok = header.indexOf("stok");
+
+  if (idxNama === -1 || idxHarga === -1) {
+    return {
+      error: "Format header CSV tidak valid. Wajib memiliki kolom 'nama' dan 'harga'.",
+    };
+  }
+
+  const barisSalah = [];
+  const validRows = [];
+
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    const nomorBaris = i + 1; // 1-based, baris 1 adalah header
+
+    const nama = (row[idxNama] || "").trim();
+    const hargaStr = (row[idxHarga] || "").replace(/[^\d]/g, "");
+    const harga = parseInt(hargaStr, 10);
+
+    if (!nama) {
+      barisSalah.push({ baris: nomorBaris, alasan: "Nama produk tidak boleh kosong" });
+      continue;
+    }
+
+    if (isNaN(harga) || harga <= 0) {
+      barisSalah.push({ baris: nomorBaris, alasan: "Harga harus berupa angka positif" });
+      continue;
+    }
+
+    const kategori = idxKategori !== -1 && row[idxKategori] ? row[idxKategori].trim() : null;
+    const deskripsi = idxDeskripsi !== -1 && row[idxDeskripsi] ? row[idxDeskripsi].trim() : null;
+    const foto_url = idxFoto !== -1 && row[idxFoto] ? row[idxFoto].trim() : null;
+    const stok = idxStok !== -1 && !isNaN(parseInt(row[idxStok], 10)) ? parseInt(row[idxStok], 10) : 10;
+
+    validRows.push({
+      nama,
+      harga,
+      kategori,
+      deskripsi,
+      foto_url,
+      stok,
+      aktif: true,
+      urutan: 0,
+    });
+  }
+
+  if (validRows.length > 0) {
+    const { error } = await supabase.from("produk").insert(validRows);
+    if (error) {
+      return { error: "Gagal menyimpan data ke database: " + error.message };
+    }
+  }
+
+  await catatLog(
+    supabase,
+    user.email,
+    "impor_csv",
+    `Berhasil: ${validRows.length}, Gagal: ${barisSalah.length}`
+  );
+
+  revalidatePath("/admin/produk");
+  revalidatePath("/");
+
+  return {
+    success: true,
+    total: rows.length - 1,
+    berhasil: validRows.length,
+    gagal: barisSalah.length,
+    barisSalah,
+  };
 }

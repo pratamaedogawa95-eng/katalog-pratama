@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
+import { toko } from "@/lib/toko";
 import GaleriFotoProduk from "@/components/GaleriFotoProduk";
 import AksiDetailProduk from "@/components/AksiDetailProduk";
 import AsistenAIProduk from "@/components/AsistenAIProduk";
@@ -9,6 +10,46 @@ import ProdukTerkait from "@/components/ProdukTerkait";
 import CatatDilihatKlien from "@/components/CatatDilihatKlien";
 
 export const dynamic = "force-dynamic";
+
+// US-26: Dynamic SEO & Open Graph Metadata
+export async function generateMetadata({ params }) {
+  const { id } = await params;
+  const supabase = createServerClient();
+  const { data: produk } = await supabase
+    .from("produk")
+    .select("nama, deskripsi, foto_url")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (!produk) {
+    return {
+      title: "Produk Tidak Ditemukan",
+    };
+  }
+
+  const judul = `${produk.nama} - ${toko.nama}`;
+  const deskripsi =
+    produk.deskripsi ||
+    `Pesan ${produk.nama} berkualitas langsung dari UMKM lokal via WhatsApp.`;
+  const foto = produk.foto_url ? [produk.foto_url] : [];
+
+  return {
+    title: judul,
+    description: deskripsi,
+    openGraph: {
+      title: judul,
+      description: deskripsi,
+      images: foto,
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: judul,
+      description: deskripsi,
+      images: foto,
+    },
+  };
+}
 
 export default async function HalamanDetailProduk({ params }) {
   const { id } = await params;

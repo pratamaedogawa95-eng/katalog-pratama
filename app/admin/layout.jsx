@@ -1,0 +1,13 @@
+// K-8: Cegah mesin pencari mengindeks seluruh rute admin
+export const metadata = {
+  robots: {
+    index: false,
+    follow: false,
+    nocache: true,
+  },
+};
+
+export default function AdminLayout({ children }) {
+  return children;
+}
+

@@ -37,6 +37,9 @@ export default async function HalamanProdukAdmin({ searchParams }) {
           <Tombol href="/admin/produk/ekspor-csv" varian="garis">
             Ekspor CSV
           </Tombol>
+          <Tombol href="/admin/produk/impor" varian="garis">
+            Impor CSV
+          </Tombol>
           <Tombol href="/admin/produk/baru">Tambah produk</Tombol>
         </div>
       </div>
