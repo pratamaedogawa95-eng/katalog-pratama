@@ -10,15 +10,8 @@ export default async function HalamanDashboard() {
     .from("produk")
     .select("*", { count: "exact", head: true });
 
-  // Produk aktif
-  let produkAktif = totalProduk;
-  try {
-    const { count } = await supabase
-      .from("produk")
-      .select("*", { count: "exact", head: true })
-      .eq("aktif", true);
-    produkAktif = count;
-  } catch {}
+  // Produk aktif (seluruh produk di katalog)
+  const produkAktif = totalProduk;
 
   // Produk per kategori
   const { data: semuaProduk } = await supabase

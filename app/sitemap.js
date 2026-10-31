@@ -9,8 +9,7 @@ export default async function sitemap() {
     const supabase = createServerClient();
     const { data: produk } = await supabase
       .from("produk")
-      .select("id, created_at, aktif")
-      .neq("aktif", false);
+      .select("id, created_at");
 
     if (produk && produk.length > 0) {
       produkUrls = produk.map((p) => ({

@@ -232,9 +232,6 @@ export async function tambahProduk(prevState, formData) {
     kategori,
     deskripsi,
     foto_url,
-    aktif: true,
-    urutan: 0,
-    stok,
   });
 
   if (error) return { error: "Gagal menyimpan produk: " + error.message };
@@ -276,7 +273,7 @@ export async function ubahProduk(prevState, formData) {
   if (!harga || harga <= 0) errors.harga = "Harga harus angka positif.";
   if (Object.keys(errors).length > 0) return { errors };
 
-  const updateData = { nama, harga, kategori, deskripsi, stok };
+  const updateData = { nama, harga, kategori, deskripsi };
 
   try {
     if (fotoFile && fotoFile.size > 0) {
@@ -330,7 +327,12 @@ export async function toggleAktifProduk(id, aktifSekarang) {
     .update({ aktif: !aktifSekarang })
     .eq("id", id);
 
-  if (error) return { error: error.message };
+  if (error) {
+    if (error.message.includes("does not exist")) {
+      return { error: "Kolom 'aktif' belum ada di tabel produk Supabase." };
+    }
+    return { error: error.message };
+  }
 
   await catatLog(supabase, user.email, "toggle_aktif", `${id} → ${!aktifSekarang ? "aktif" : "nonaktif"}`);
   revalidatePath("/admin/produk");
@@ -353,7 +355,12 @@ export async function ubahUrutanProduk(id, urutanBaru) {
     .update({ urutan })
     .eq("id", id);
 
-  if (error) return { error: error.message };
+  if (error) {
+    if (error.message.includes("does not exist")) {
+      return { error: "Kolom 'urutan' belum ada di tabel produk Supabase." };
+    }
+    return { error: error.message };
+  }
 
   revalidatePath("/admin/produk");
   revalidatePath("/");
@@ -370,7 +377,12 @@ export async function naikUrutanProduk(id, urutanSekarang = 0) {
     .update({ urutan: urutanBaru })
     .eq("id", id);
 
-  if (error) return { error: error.message };
+  if (error) {
+    if (error.message.includes("does not exist")) {
+      return { error: "Kolom 'urutan' belum ada di tabel produk Supabase." };
+    }
+    return { error: error.message };
+  }
 
   revalidatePath("/admin/produk");
   revalidatePath("/");
@@ -387,7 +399,12 @@ export async function turunUrutanProduk(id, urutanSekarang = 0) {
     .update({ urutan: urutanBaru })
     .eq("id", id);
 
-  if (error) return { error: error.message };
+  if (error) {
+    if (error.message.includes("does not exist")) {
+      return { error: "Kolom 'urutan' belum ada di tabel produk Supabase." };
+    }
+    return { error: error.message };
+  }
 
   revalidatePath("/admin/produk");
   revalidatePath("/");
@@ -787,9 +804,6 @@ export async function imporProdukCSV(prevState, formData) {
       kategori,
       deskripsi,
       foto_url,
-      stok,
-      aktif: true,
-      urutan: 0,
     });
   }
 

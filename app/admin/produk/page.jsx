@@ -17,7 +17,6 @@ export default async function HalamanProdukAdmin({ searchParams }) {
   let query = supabase
     .from("produk")
     .select("*", { count: "exact" })
-    .order("urutan", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: false })
     .range(dari, dari + PER_HALAMAN - 1);
 

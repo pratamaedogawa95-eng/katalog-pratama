@@ -29,11 +29,8 @@ export default async function HalamanKatalog({ searchParams }) {
       );
     }
 
-    // Bangun query produk di server (US-11, US-15, US-16, US-32, US-47)
+    // Bangun query produk di server (US-11, US-15, US-16)
     let query = supabase.from("produk").select("*", { count: "exact" });
-
-    // US-32: Sembunyikan produk nonaktif
-    query = query.neq("aktif", false);
 
     // Filter Kategori (US-11)
     if (kategoriAktif && kategoriAktif !== "semua") {
@@ -45,7 +42,7 @@ export default async function HalamanKatalog({ searchParams }) {
       query = query.ilike("nama", `%${pencarianAktif.trim()}%`);
     }
 
-    // Urutan produk (US-15, US-47, US-49)
+    // Urutan produk (US-15 & 49)
     if (urutanAktif === "termurah") {
       query = query.order("harga", { ascending: true });
     } else if (urutanAktif === "termahal") {
@@ -55,10 +52,7 @@ export default async function HalamanKatalog({ searchParams }) {
     } else if (urutanAktif === "abjad_desc") {
       query = query.order("nama", { ascending: false });
     } else {
-      // Bawaan: urutan prioritas admin (US-47), lalu terbaru
-      query = query
-        .order("urutan", { ascending: true, nullsFirst: false })
-        .order("created_at", { ascending: false });
+      query = query.order("created_at", { ascending: false });
     }
 
     // Paginasi / pembatasan jumlah di database (US-16)
