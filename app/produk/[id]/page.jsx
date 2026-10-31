@@ -21,7 +21,8 @@ export default async function HalamanDetailProduk({ params }) {
     .eq("id", id)
     .maybeSingle();
 
-  if (error || !produk) {
+  // US-32: Jika produk tidak ditemukan atau nonaktif, tampilkan not-found
+  if (error || !produk || produk.aktif === false) {
     notFound();
   }
 
